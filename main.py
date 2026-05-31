@@ -4,6 +4,8 @@ import Bot
 import json
 import re
 
+import llm
+
 thresholds = {
     '11 ': 110,
     '11 pro ': 130,
@@ -19,7 +21,7 @@ thresholds = {
 }
 
 banned_words = [
-    "64", "hülle", "case", "suche", "gehäuse", "display", "iphone 4", "iphone 3", "iphone 5", "kaputt", "ankauf"
+    "64", "hülle", "case", "suche", "gehäuse", "display", "iphone 4", "iphone 3", "iphone 5", "kaputt", "ankauf", "reparatur"
 ]
 
 search_page = "https://www.kleinanzeigen.de/s-iphone/k0"
@@ -42,9 +44,12 @@ async def main():
                     if (await is_description_and_rating_good(item["link"], page)):
                         await Bot.send_item(item)
                         await context.storage_state(path="state.json")
+                    else:
+                        print("Bad deal...")
                     while len(recent_item_links) >= 30:
                         recent_item_links.pop()
 
+            print("Refreshing the page...")
             await page.reload()
             await page.wait_for_timeout(5000)
 
@@ -101,7 +106,6 @@ async def get_items(page):
             not any(word in item["name"].lower() for word in banned_words)):
             items.append(item)
 
-    print(items)
     return items
 
 async def is_description_and_rating_good(link, page):
@@ -120,6 +124,20 @@ async def is_description_and_rating_good(link, page):
 
     print("DESCRIPTION: " + description)
     await page.goto(search_page)
+
+    if "na ja" in rating.lower():
+        print("Scammer...")
+        return False
+
+    llm_description_data = llm.get_description_rating(description)
+    if llm_description_data["parts_broken"]:
+        print("A part is broken...")
+        return False
+
+    if llm_description_data["battery_health"] < 80:
+        print("Battery health is low...")
+        return False
+
     return True
 
 

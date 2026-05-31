@@ -3,3 +3,4 @@ MarkChichko.py
 __pycache__/
 requirements.txt
 secret_info.json
+state.json
